@@ -1,5 +1,5 @@
 /*!
- * Laue v0.1.1
+ * Laue vundefined
  * https://laue.js.org
  *
  * Copyright (c) 2018 qingwei-li
@@ -285,7 +285,9 @@ var plane = {
   mounted: function mounted() {
     if (this.autoresize) {
       this.resize();
-      typeof window !== 'undefined' && window.addEventListener('resize', debounce(this.resize));
+      if (typeof window !== 'undefined') {
+        window.addEventListener('resize', debounce(this.resize));
+      }
     }
   }
 }
@@ -538,6 +540,16 @@ var Polar = {
 
   mixins: [plane],
 
+  props: {
+    fillContainer: Boolean
+  },
+
+  computed: {
+    min: function min() {
+      return Math.min(this.viewWidth, this.height)
+    }
+  },
+
   render: function render(h) {
     var ref = this;
     var viewWidth = ref.viewWidth;
@@ -599,9 +611,10 @@ var Polar = {
           'svg',
           {
             attrs: {
-              width: viewWidth,
-              height: height,
-              viewBox: ("0 0 " + viewWidth + " " + height)
+              width: this.fillContainer ? '100%' : viewWidth,
+              height: this.fillContainer ? '100%' : height,
+              viewBox: this.fillContainer ? ("0 0 " + (this.min) + " " + (this.min)) : ("0 0 " + viewWidth + " " + height),
+              preserveAspectRatio: 'xMinYMin'
             }
           },
           [others, polars]
@@ -2205,10 +2218,18 @@ var Pie = {
     },
 
     curRadius: function curRadius() {
-      var ref = this;
-      var radius = ref.radius;
+      var innerRadius = isArr(this.radius) ? this.radius[0] : 0;
+      var outerRadius = isArr(this.radius) ? this.radius[1] : 100;
 
-      return isArr(radius) ? radius : [0, radius]
+      if (this.min && this.$parent.fillContainer) {
+        outerRadius = this.min / 2;
+
+        if (this.showLabel) {
+          outerRadius -= this.min / 4;
+        }
+      }
+
+      return [innerRadius, outerRadius]
     },
 
     curAngles: function curAngles() {
@@ -2226,8 +2247,21 @@ var Pie = {
 
     drawText: function drawText() {
       return arc()
-        .innerRadius(this.curRadius[1] * 0.7)
-        .outerRadius(this.curRadius[1] * 0.7)
+        .innerRadius((this.$parent.fillContainer ? 0 : this.curRadius[1]) * 0.7)
+        .outerRadius((this.$parent.fillContainer ? this.min : this.curRadius[1]) * 0.7)
+    },
+
+    drawTextLabels: function drawTextLabels() {
+      var innerRadius = this.$parent.fillContainer ? (this.radius[0] + this.min / 5) : this.curRadius[1] * 0.7;
+      var outerRadius = this.$parent.fillContainer ? (this.radius[0] + this.min / 5) : this.curRadius[1] * 0.7;
+
+      return arc()
+        .innerRadius(innerRadius)
+        .outerRadius(outerRadius)
+    },
+
+    min: function min() {
+      return this.$parent.min
     },
 
     valueSlot: function valueSlot() {
@@ -2274,7 +2308,7 @@ var Pie = {
       var h = this.$createElement;
 
       return this.arcs.map(function (arc$$1, i) {
-        var point = this$1.drawText.centroid(arc$$1);
+        var point = this$1.drawTextLabels.centroid(arc$$1);
 
         return h(
           'text',
